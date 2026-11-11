@@ -1,4 +1,7 @@
 import serial
+import csv
+import json
+import time
 
 #port settings
 PORT = '/dev/cu.usbmodem1101'
@@ -12,6 +15,13 @@ try:
         
         #Clear the buffer of old data before reading
         ser.reset_input_buffer() 
+
+        good = 0
+        bad = 0
+        missed = 0
+        last_seq = None
+        start = time.time()
+        last_report = start
         
         while True:
             # Read a line up to the newline character (\n)
@@ -22,7 +32,31 @@ try:
                 # Decode bytes to a string and strip whitespace/newlines (\r\n)
                 line_string = line_bytes.decode('utf-8', errors='ignore').strip()
                 if line_string.startswith('CSI_DATA'):
-                    print(line_string)
+                    #print(line_string)
+                    #fields = next(csv.reader([line_string]))
+                    #print(len(fields))
+                    #print(fields[:10])
+                    try:
+                        fields = next(csv.reader([line_string]))
+                        if len(fields) != 25:
+                            raise ValueError("wrong field count")
+                        seq = int(fields[1])
+                        rssi = int(fields[3])
+                        csi = json.loads(fields[24])
+                        if len(csi) != 384:
+                            raise ValueError("wrong CSI length")
+                    except (ValueError, json.JSONDecodeError):
+                        bad +=1
+                        continue 
+                    good+=1
+                    if last_seq is not None and seq > last_seq + 1:
+                        missed += seq - last_seq -1 
+                    if time.time() - last_report >= 5:
+                        rate = (good/ (time.time() - start))
+                        print(f"good={good}, bad={bad}, missed={missed}, rate:{rate:.2f} Hz")
+                        last_report = time.time()
+
+                    #print(seq, rssi, len(csi))
                 
 except serial.SerialException as e:
     print(f"Error opening or communicating on port {PORT}: {e}")
