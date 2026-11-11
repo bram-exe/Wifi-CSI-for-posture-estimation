@@ -3,25 +3,31 @@ import csv
 import json
 import time
 import argparse
+import os
 
 #port settings
-PORT = '/dev/cu.usbmodem1101'
+#PORT = '/dev/cu.usbmodem1101'
 BAUDRATE = 921600  
 TIMEOUT = 1     
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--label", type=str, required=True, help= "sitting, standing, waving")
-parser.add_argument("--subject", type=str, choices=["Bram", "Sarah"])
-parser.add_argument("--session", type=int)
+parser.add_argument("--subject", type=str, required=True, choices=["Bram", "Sarah"])
+parser.add_argument("--session", required = True, type=int)
 parser.add_argument("--duration", type = int, default=60, help= "enter number of seconds to record")
 parser.add_argument("--port", default='/dev/cu.usbmodem1101', type=str)
 args = parser.parse_args() 
 
+os.makedirs("data", exist_ok=True)
+filename = f"data/s{args.session}_{args.subject}_{args.label}_{time.strftime('%Y%m%d_%H%M%S')}.csv"
+
 try:
     # Open the serial port
-    with serial.Serial(args.port, BAUDRATE, timeout=TIMEOUT) as ser:
-        print(f"Connected to {args.port}. Recoring '{args.label}' for {args.duration}s")
-        
+    with serial.Serial(args.port, BAUDRATE, timeout=TIMEOUT) as ser, open(filename, 'w', newline='') as f:
+        print(f"Connected to {args.port}. Recording '{args.label}' for {args.duration}s")
+
+        writer = csv.writer(f)
+        writer.writerow(["time", "seq", "rssi", "label", "subject", "session", "csi"])
         #Clear the buffer of old data before reading
         ser.reset_input_buffer() 
 
@@ -61,6 +67,9 @@ try:
                         bad +=1
                         continue 
                     good+=1
+
+                    writer.writerow([time.time(), seq, rssi, args.label, args.subject, args.session, fields[24]])
+
                     if last_seq is not None and seq > last_seq + 1:
                         missed += seq - last_seq -1 
                     last_seq = seq
@@ -70,8 +79,13 @@ try:
                         last_report = time.time()
 
                     #print(seq, rssi, len(csi))
+        elapsed = time.time() - start
+        print(f"DONE. good={good}, bad={bad}, missed={missed}, rate:{good/elapsed:.2f} Hz -> {filename}")
                 
 except serial.SerialException as e:
-    print(f"Error opening or communicating on port {PORT}: {e}")
+    print(f"Error opening or communicating on port {args.port}: {e}")
 except KeyboardInterrupt:
+    #os.remove(filename)
+    if os.path.exists(filename):
+        os.remove(filename)
     print("\nProgram stopped by user.")
