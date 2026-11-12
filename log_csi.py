@@ -38,15 +38,18 @@ try:
         start = time.time()
         last_report = start
         
-
+        buf = b""   
         while True:
             # Read a line up to the newline character (\n)
-            line_bytes = ser.readline()
+            #line_bytes = ser.readline()
             if time.time() - start >= args.duration:
                 break
+            buf += ser.read(ser.in_waiting or 1)
+            *lines, buf = buf.split(b"\n")
+            
             
             # Check if we actually received data (pyserial returns empty bytes on timeout)
-            if line_bytes:
+            for line_bytes in lines:
                 # Decode bytes to a string and strip whitespace/newlines (\r\n)
                 line_string = line_bytes.decode('utf-8', errors='ignore').strip()
                 if line_string.startswith('CSI_DATA'):
