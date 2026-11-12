@@ -1,6 +1,6 @@
 import serial
 import csv
-import json
+#import json
 import time
 import argparse
 import os
@@ -63,10 +63,12 @@ try:
                             raise ValueError("wrong field count")
                         seq = int(fields[1])
                         rssi = int(fields[3])
-                        csi = json.loads(fields[24])
-                        if len(csi) != 384:
-                            raise ValueError("wrong CSI length")
-                    except (ValueError, json.JSONDecodeError):
+                        #csi = json.loads(fields[24])
+                        #if len(csi) != 384:
+                            #raise ValueError("wrong CSI length")
+                        if fields[24].count(",") != 383:
+                            raise ValueError("wrong CSI length")    
+                    except ValueError:
                         bad +=1
                         continue 
                     good+=1
